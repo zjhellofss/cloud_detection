@@ -53,8 +53,14 @@ def load_image_test(input_image_path, input_mask_path):
 
 
 if __name__ == '__main__':
-    images = glob.glob(r'./dataset/JPEGImages/*.png')
-    labels = glob.glob(r'./dataset/Annotations/*.png')
+
+
+    image_paths = './dataset/JPEGImages/'
+    label_paths = './dataset/Annotations'
+
+
+    images = glob.glob(image_paths + '*.png')
+    labels = glob.glob(label_paths + '*.png')
     images.sort(key=lambda x: x.split('/')[-1])
     labels.sort(key=lambda x: x.split('/')[-1])
 

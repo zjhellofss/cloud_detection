@@ -85,6 +85,9 @@ if __name__ == '__main__':
     train_dataset = train.shuffle(BUFFER_SIZE).batch(BATCH_SIZE).repeat()
     train_dataset = train_dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     test_dataset = test.batch(batch_size=BATCH_SIZE)
+
     model = tf.keras.models.load_model(r'D:\result\weights_090-0.035023.h5',
                                        custom_objects={'jacc_coef': jacc_coef})
+
+
     print(model.evaluate(test_dataset))
