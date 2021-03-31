@@ -2,7 +2,7 @@ import math
 import random
 
 import tensorflow as tf
-from resnet50 import get_resnet50_encoder
+from resnet import get_resnet50_encoder
 from tensorflow import keras
 import tensorflow.keras.backend as K
 import pix2pix

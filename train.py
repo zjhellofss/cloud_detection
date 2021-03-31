@@ -1,278 +1,119 @@
-from keras.models import Model
-from keras.layers import Input, concatenate, Conv2D, MaxPooling2D, Conv2DTranspose, BatchNormalization,\
-    Activation, Dropout
-import keras
-
-"""
-Some parts borrowed from https://www.kaggle.com/cjansen/u-net-in-keras
-"""
-
-
-def bn_relu(input_tensor):
-    """It adds a Batch_normalization layer before a Relu
-    """
-    input_tensor = BatchNormalization(axis=3)(input_tensor)
-    return Activation("relu")(input_tensor)
-
-
-def contr_arm(input_tensor, filters, kernel_size):
-    """It adds a feedforward signal to the output of two following conv layers in contracting path
-    """
-
-    x = Conv2D(filters, kernel_size, padding='same')(input_tensor)
-    x = bn_relu(x)
-
-    x = Conv2D(filters, kernel_size, padding='same')(x)
-    x = bn_relu(x)
-
-    filters_b = filters // 2
-    kernel_size_b = (kernel_size[0]-2, kernel_size[0]-2)  # creates a kernl size of (1,1) out of (3,3)
-
-    x1 = Conv2D(filters_b, kernel_size_b, padding='same')(input_tensor)
-    x1 = bn_relu(x1)
-
-    x1 = concatenate([input_tensor, x1], axis=3)
-    x = keras.layers.add([x, x1])
-    x = Activation("relu")(x)
-    return x
-
-
-def imprv_contr_arm(input_tensor, filters, kernel_size ):
-    """It adds a feedforward signal to the output of two following conv layers in contracting path
-    """
-
-    x = Conv2D(filters, kernel_size, padding='same')(input_tensor)
-    x = bn_relu(x)
-
-    x0 = Conv2D(filters, kernel_size, padding='same')(x)
-    x0 = bn_relu(x0)
-
-    x = Conv2D(filters, kernel_size, padding='same')(x0)
-    x = bn_relu(x)
-
-    filters_b = filters // 2
-    kernel_size_b = (kernel_size[0]-2, kernel_size[0]-2)  # creates a kernl size of (1,1) out of (3,3)
-
-    x1 = Conv2D(filters_b, kernel_size_b, padding='same')(input_tensor)
-    x1 = bn_relu(x1)
-
-    x1 = concatenate([input_tensor, x1], axis=3)
-
-    x2 = Conv2D(filters, kernel_size_b, padding='same')(x0)
-    x2 = bn_relu(x2)
-
-    x = keras.layers.add([x, x1, x2])
-    x = Activation("relu")(x)
-    return x
-
-
-def bridge(input_tensor, filters, kernel_size):
-    """It is exactly like the identity_block plus a dropout layer. This block only uses in the valley of the UNet
-    """
-
-    x = Conv2D(filters, kernel_size, padding='same')(input_tensor)
-    x = bn_relu(x)
-
-    x = Conv2D(filters, kernel_size, padding='same')(x)
-    x = Dropout(.15)(x)
-    x = bn_relu(x)
-
-    filters_b = filters // 2
-    kernel_size_b = (kernel_size[0]-2, kernel_size[0]-2)  # creates a kernl size of (1,1) out of (3,3)
-
-    x1 = Conv2D(filters_b, kernel_size_b, padding='same')(input_tensor)
-    x1 = bn_relu(x1)
-
-    x1 = concatenate([input_tensor, x1], axis=3)
-    x = keras.layers.add([x, x1])
-    x = Activation("relu")(x)
-    return x
-
-
-def conv_block_exp_path(input_tensor, filters, kernel_size):
-    """It Is only the convolution part inside each expanding path's block
-    """
-
-    x = Conv2D(filters, kernel_size, padding='same')(input_tensor)
-    x = bn_relu(x)
-
-    x = Conv2D(filters, kernel_size, padding='same')(x)
-    x = bn_relu(x)
-    return x
-
-
-def conv_block_exp_path3(input_tensor, filters, kernel_size):
-    """It Is only the convolution part inside each expanding path's block
-    """
-
-    x = Conv2D(filters, kernel_size, padding='same')(input_tensor)
-    x = bn_relu(x)
-
-    x = Conv2D(filters, kernel_size, padding='same')(x)
-    x = bn_relu(x)
-
-    x = Conv2D(filters, kernel_size, padding='same')(x)
-    x = bn_relu(x)
-    return x
-
-
-def add_block_exp_path(input_tensor1, input_tensor2, input_tensor3):
-    """It is for adding two feed forwards to the output of the two following conv layers in expanding path
-    """
-
-    x = keras.layers.add([input_tensor1, input_tensor2, input_tensor3])
-    x = Activation("relu")(x)
-    return x
-
-
-def improve_ff_block4(input_tensor1, input_tensor2 ,input_tensor3, input_tensor4, pure_ff):
-    """It improves the skip connection by using previous layers feature maps
-    """
-
-    for ix in range(1):
-        if ix == 0:
-            x1 = input_tensor1
-        x1 = concatenate([x1, input_tensor1], axis=3)
-    x1 = MaxPooling2D(pool_size=(2, 2))(x1)
-
-    for ix in range(3):
-        if ix == 0:
-            x2 = input_tensor2
-        x2 = concatenate([x2, input_tensor2], axis=3)
-    x2 = MaxPooling2D(pool_size=(4, 4))(x2)
-
-    for ix in range(7):
-        if ix == 0:
-            x3 = input_tensor3
-        x3 = concatenate([x3, input_tensor3], axis=3)
-    x3 = MaxPooling2D(pool_size=(8, 8))(x3)
-
-    for ix in range(15):
-        if ix == 0:
-            x4 = input_tensor4
-        x4 = concatenate([x4, input_tensor4], axis=3)
-    x4 = MaxPooling2D(pool_size=(16, 16))(x4)
-
-    x = keras.layers.add([x1, x2, x3, x4, pure_ff])
-    x = Activation("relu")(x)
-    return x
-
-
-def improve_ff_block3(input_tensor1, input_tensor2, input_tensor3, pure_ff):
-    """It improves the skip connection by using previous layers feature maps
-    """
-
-    for ix in range(1):
-        if ix == 0:
-            x1 = input_tensor1
-        x1 = concatenate([x1, input_tensor1], axis=3)
-    x1 = MaxPooling2D(pool_size=(2, 2))(x1)
-
-    for ix in range(3):
-        if ix == 0:
-            x2 = input_tensor2
-        x2 = concatenate([x2, input_tensor2], axis=3)
-    x2 = MaxPooling2D(pool_size=(4, 4))(x2)
-
-    for ix in range(7):
-        if ix == 0:
-            x3 = input_tensor3
-        x3 = concatenate([x3, input_tensor3], axis=3)
-    x3 = MaxPooling2D(pool_size=(8, 8))(x3)
-
-    x = keras.layers.add([x1, x2, x3, pure_ff])
-    x = Activation("relu")(x)
-    return x
-
-
-def improve_ff_block2(input_tensor1, input_tensor2, pure_ff):
-    """It improves the skip connection by using previous layers feature maps
-    """
-
-    for ix in range(1):
-        if ix == 0:
-            x1 = input_tensor1
-        x1 = concatenate([x1, input_tensor1], axis=3)
-    x1 = MaxPooling2D(pool_size=(2, 2))(x1)
-
-    for ix in range(3):
-        if ix == 0:
-            x2 = input_tensor2
-        x2 = concatenate([x2, input_tensor2], axis=3)
-    x2 = MaxPooling2D(pool_size=(4, 4))(x2)
-
-    x = keras.layers.add([x1, x2, pure_ff])
-    x = Activation("relu")(x)
-    return x
-
-
-def improve_ff_block1(input_tensor1, pure_ff):
-    """It improves the skip connection by using previous layers feature maps
-    """
-
-    for ix in range(1):
-        if ix == 0:
-            x1 = input_tensor1
-        x1 = concatenate([x1, input_tensor1], axis=3)
-    x1 = MaxPooling2D(pool_size=(2, 2))(x1)
-
-    x = keras.layers.add([x1, pure_ff])
-    x = Activation("relu")(x)
-    return x
-
-
-def model_arch(input_rows=384, input_cols=384, num_of_channels=3, num_of_classes=1):
-    inputs = Input((input_rows, input_cols, num_of_channels))
-    conv1 = Conv2D(16, (3, 3), activation='relu', padding='same')(inputs)
-
-    conv1 = contr_arm(conv1, 32, (3, 3))
-    pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
-
-    conv2 = contr_arm(pool1, 64, (3, 3))
-    pool2 = MaxPooling2D(pool_size=(2, 2))(conv2)
-
-    conv3 = contr_arm(pool2, 128, (3, 3))
-    pool3 = MaxPooling2D(pool_size=(2, 2))(conv3)
-
-    conv4 = contr_arm(pool3, 256, (3, 3))
-    pool4 = MaxPooling2D(pool_size=(2, 2))(conv4)
-
-    conv5 = imprv_contr_arm(pool4, 512, (3, 3))
-    pool5 = MaxPooling2D(pool_size=(2, 2))(conv5)
-
-    conv6 = bridge(pool5, 1024, (3, 3))
-
-    convT7 = Conv2DTranspose(512, (2, 2), strides=(2, 2), padding='same')(conv6)
-    prevup7 = improve_ff_block4(input_tensor1=conv4, input_tensor2=conv3, input_tensor3=conv2, input_tensor4=conv1, pure_ff=conv5)
-    up7 = concatenate([convT7, prevup7], axis=3)
-    conv7 = conv_block_exp_path3(input_tensor=up7, filters=512, kernel_size=(3, 3))
-    conv7 = add_block_exp_path(conv7, conv5, convT7)
-
-    convT8 = Conv2DTranspose(256, (2, 2), strides=(2, 2), padding='same')(conv7)
-    prevup8 = improve_ff_block3(input_tensor1=conv3, input_tensor2=conv2, input_tensor3=conv1, pure_ff=conv4)
-    up8 = concatenate([convT8, prevup8], axis=3)
-    conv8 = conv_block_exp_path(input_tensor=up8, filters=256, kernel_size=(3, 3))
-    conv8 = add_block_exp_path(input_tensor1=conv8, input_tensor2=conv4, input_tensor3=convT8)
-
-    convT9 = Conv2DTranspose(128, (2, 2), strides=(2, 2), padding='same')(conv8)
-    prevup9 = improve_ff_block2(input_tensor1=conv2, input_tensor2=conv1, pure_ff=conv3)
-    up9 = concatenate([convT9, prevup9], axis=3)
-    conv9 = conv_block_exp_path(input_tensor=up9, filters=128, kernel_size=(3, 3))
-    conv9 = add_block_exp_path(input_tensor1=conv9, input_tensor2=conv3, input_tensor3=convT9)
-
-    convT10 = Conv2DTranspose(64, (2, 2), strides=(2, 2), padding='same')(conv9)
-    prevup10 = improve_ff_block1(input_tensor1=conv1, pure_ff=conv2)
-    up10 = concatenate([convT10, prevup10], axis=3)
-    conv10 = conv_block_exp_path(input_tensor=up10, filters=64, kernel_size=(3, 3))
-    conv10 = add_block_exp_path(input_tensor1=conv10, input_tensor2=conv2, input_tensor3=convT10)
-
-    convT11 = Conv2DTranspose(32, (2, 2), strides=(2, 2), padding='same')(conv10)
-    up11 = concatenate([convT11, conv1], axis=3)
-    conv11 = conv_block_exp_path(input_tensor=up11, filters=32, kernel_size=(3, 3))
-    conv11 = add_block_exp_path(input_tensor1=conv11, input_tensor2=conv1, input_tensor3=convT11)
-
-    conv12 = Conv2D(num_of_classes, (1, 1), activation='sigmoid')(conv11)
-
-    return Model(inputs=[inputs], outputs=[conv12])
-
-
+import os
+import glob
+import shutil
+
+import pix2pix
+import tensorflow as tf
+import numpy as np
+from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, CSVLogger, EarlyStopping
+
+
+def read_jpg(path):
+    img = tf.io.read_file(path)
+    img = tf.image.decode_png(img, channels=3)
+    return img
+
+
+def read_png(path):
+    img = tf.io.read_file(path)
+    img = tf.image.decode_png(img, channels=1)
+    return img
+
+
+max_possible_input_value = 255
+
+
+def normalize(input_image, input_mask):
+    input_image /= 255
+    input_mask /= 255
+    return input_image, input_mask
+
+
+def load_image(input_image_path, input_mask_path):
+    input_image = read_jpg(input_image_path)
+    input_mask = read_png(input_mask_path)
+    input_image = tf.image.resize(input_image, (384, 384))
+    input_mask = tf.image.resize(input_mask, (384, 384))
+    if tf.random.uniform(()) > 0.5:
+        input_image = tf.image.flip_left_right(input_image)
+        input_mask = tf.image.flip_left_right(input_mask)
+    input_image, input_mask = normalize(input_image, input_mask)
+    return input_image, input_mask
+
+
+def load_image_test(input_image_path, input_mask_path):
+    input_image = read_jpg(input_image_path)
+    input_mask = read_png(input_mask_path)
+
+    input_image = tf.image.resize(input_image, (384, 384))
+    input_mask = tf.image.resize(input_mask, (384, 384))
+
+    input_image, input_mask = normalize(input_image, input_mask)
+    return input_image, input_mask
+
+
+if __name__ == '__main__':
+    images = glob.glob(r'./dataset/JPEGImages/*.png')
+    labels = glob.glob(r'./dataset/Annotations/*.png')
+    images.sort(key=lambda x: x.split('/')[-1])
+    labels.sort(key=lambda x: x.split('/')[-1])
+
+    np.random.seed(2022)
+    index = np.random.permutation(len(images))
+
+    images = np.array(images)[index]
+    labels = np.array(labels)[index]
+
+    dataset = tf.data.Dataset.from_tensor_slices((images, labels))
+    test_count = int(len(images) * 0.2)
+    train_count = len(images) - test_count
+
+    dataset_train = dataset.skip(test_count)
+    dataset_test = dataset.take(test_count)
+
+    BATCH_SIZE = 16
+    BUFFER_SIZE = 331
+    STEPS_PER_EPOCH = train_count // BATCH_SIZE
+    VALIDATION_STEPS = test_count // BATCH_SIZE
+    ############################################
+    train = dataset_train.map(load_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    test = dataset_test.map(load_image_test)
+
+    train_dataset = train.shuffle(BUFFER_SIZE).batch(BATCH_SIZE).repeat()
+    train_dataset = train_dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    test_dataset = test.batch(batch_size=BATCH_SIZE)
+    OUTPUT_CHANNELS = 1
+
+    from unet import _unet
+    from resnet import get_resnet50_encoder
+
+    model = _unet(1, get_resnet50_encoder)
+    starting_learning_rate = 1e-4
+    # model.compile(optimizer=Adam(lr=starting_learning_rate), loss=jacc_coef, metrics=[jacc_coef, 'accuracy'])
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=starting_learning_rate),
+                  loss=tf.keras.losses.BinaryCrossentropy(),
+                  metrics=['accuracy', tf.keras.metrics.Precision(), tf.keras.metrics.Recall(),
+                           ])
+    early_stopping = EarlyStopping(monitor='val_loss', patience=15, verbose=2)
+    EPOCHS = 100
+    weight_path = r'./models'
+    weights_path = os.path.join(weight_path, 'weights_{epoch:03d}-{val_loss:.6f}.h5')
+    model_checkpoint = ModelCheckpoint(weights_path, monitor='val_loss', save_best_only=True)
+    starting_learning_rate = 1e-4
+    end_learning_rate = 1e-8
+    patience = 15
+    decay_factor = 0.7
+    lr_reducer = ReduceLROnPlateau(factor=decay_factor, cooldown=0, patience=patience, min_lr=end_learning_rate,
+                                   verbose=1)
+
+    csv_logger = CSVLogger('Cloud' + '_log_1.log')
+    # display([sample_image, sample_mask])
+    from utils import ADAMLearningRateTracker
+
+    model_history = model.fit(train_dataset, epochs=EPOCHS,
+                              steps_per_epoch=STEPS_PER_EPOCH,
+                              validation_steps=VALIDATION_STEPS,
+                              validation_data=test_dataset,
+                              callbacks=[model_checkpoint, csv_logger, lr_reducer,
+                                         ADAMLearningRateTracker(end_learning_rate), early_stopping]
+                              )
