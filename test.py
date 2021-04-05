@@ -4,6 +4,7 @@ import shutil
 
 import tensorflow as tf
 import tensorflow.keras.backend as K
+import cv2 as cv
 
 
 def read_jpg(path):
@@ -89,5 +90,18 @@ if __name__ == '__main__':
     model = tf.keras.models.load_model(r'D:\result\weights_090-0.035023.h5',
                                        custom_objects={'jacc_coef': jacc_coef})
 
-
     print(model.evaluate(test_dataset))
+    count = 0
+    for image, mask in test_dataset.take(-1):
+        pred_mask = model.predict(image)[0]
+        tf.keras.preprocessing.image.array_to_img(image[0]).save('./output/true_image__{}.jpg'.format(count))
+        tf.keras.preprocessing.image.array_to_img(mask[0]).save('./output/true_mask__{}.jpg'.format(count))
+        pred_mask = pred_mask * 255
+        pred_mask[pred_mask < 127] = 0
+        pred_mask[pred_mask > 0] = 255
+
+        cv.imwrite('./output/prediction_mask__{}.jpg'.format(count), pred_mask)
+        count += 1
+
+        if count == 200:
+            break

@@ -20,7 +20,7 @@ Set the location of the model, and then enter the following command on the comma
     python test.py
 ```
 
-## 预训练模型的下载地址(Download Pretraining model)
+## 预训练模型和数据集的下载地址(Download Pretraining model and dataset)
 https://pan.baidu.com/s/1DhL0ycsezjE93ZewodVfbQ  (f0r1)
 
 ## 需要的环境（Environment needed）
