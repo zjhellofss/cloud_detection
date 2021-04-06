@@ -87,11 +87,13 @@ if __name__ == '__main__':
     train_dataset = train_dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     test_dataset = test.batch(batch_size=BATCH_SIZE)
 
-    model = tf.keras.models.load_model(r'D:\result\weights_090-0.035023.h5',
+    model = tf.keras.models.load_model(r'F:\新的实验数据\ours\All-50\weights_049-0.023977.h5',
                                        custom_objects={'jacc_coef': jacc_coef})
 
     print(model.evaluate(test_dataset))
     count = 0
+    if not os.path.exists('./output'):
+        os.mkdir('./output')
     for image, mask in test_dataset.take(-1):
         pred_mask = model.predict(image)[0]
         tf.keras.preprocessing.image.array_to_img(image[0]).save('./output/true_image__{}.jpg'.format(count))
